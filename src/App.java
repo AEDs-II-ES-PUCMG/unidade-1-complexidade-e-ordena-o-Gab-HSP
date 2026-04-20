@@ -1,11 +1,13 @@
 import java.util.Arrays;
 import java.util.Random;
+import java.util.Scanner;
 
 public class App {
     static final int[] tamanhosTesteGrande =  { 31_250_000, 62_500_000, 125_000_000, 250_000_000, 500_000_000 };
     static final int[] tamanhosTesteMedio =   {     12_500,     25_000,      50_000,     100_000,     200_000 };
     static final int[] tamanhosTestePequeno = {          3,          6,          12,          24,          48 };
     static Random aleatorio = new Random();
+    static Scanner scanner = new Scanner(System.in);
     static long operacoes;
     static double nanoToMilli = 1.0/1_000_000;
     
@@ -41,138 +43,188 @@ public class App {
      * @param ordenador O algoritmo de ordenação a ser testado
      * @param vetorOriginal O vetor a ser ordenado
      * @param nome Nome do algoritmo para exibição
+     * @param exibirVetor Se true, exibe o vetor ordenado
      */
-    static void testarAlgoritmo(IOrdenador<Integer> ordenador, Integer[] vetorOriginal, String nome) {
+    static void testarAlgoritmo(IOrdenador<Integer> ordenador, Integer[] vetorOriginal, String nome, boolean exibirVetor) {
         Integer[] vetorCopia = vetorOriginal.clone();
+        
+        System.out.print("Ordenando com " + nome + "... ");
+        
         Integer[] vetorOrdenado = ordenador.ordenar(vetorCopia);
         
-        System.out.println("\n--- " + nome + " ---");
-        System.out.println("Comparações: " + ordenador.getComparacoes());
-        System.out.println("Movimentações: " + ordenador.getMovimentacoes());
-        System.out.println("Tempo de ordenação (ms): " + String.format("%.3f", ordenador.getTempoOrdenacao()));
+        System.out.println("CONCLUÍDO!");
+        System.out.println("  Comparações: " + ordenador.getComparacoes());
+        System.out.println("  Movimentações: " + ordenador.getMovimentacoes());
+        System.out.println("  Tempo de ordenação: " + String.format("%.3f", ordenador.getTempoOrdenacao()) + " ms");
         
-        // Verifica se o vetor foi ordenado corretamente (apenas para vetores pequenos)
-        if (vetorOriginal.length <= 48) {
-            System.out.println("Vetor ordenado: " + Arrays.toString(vetorOrdenado));
+        // Verifica se o vetor foi ordenado corretamente
+        boolean estaOrdenado = true;
+        for (int i = 0; i < vetorOrdenado.length - 1; i++) {
+            if (vetorOrdenado[i].compareTo(vetorOrdenado[i+1]) > 0) {
+                estaOrdenado = false;
+                break;
+            }
+        }
+        System.out.println("  Vetor ordenado corretamente: " + (estaOrdenado ? "SIM" : "NÃO"));
+        
+        // Exibe o vetor ordenado se solicitado e se for pequeno
+        if (exibirVetor && vetorOriginal.length <= 48) {
+            System.out.println("  Vetor ordenado: " + Arrays.toString(vetorOrdenado));
         }
     }
 
     /**
-     * Método para testar todos os algoritmos com diferentes tamanhos de vetor
-     * @param tamanhos Array com os tamanhos a serem testados
-     * @param nomeGrupo Nome do grupo de teste (Pequeno, Médio, Grande)
+     * Exibe o menu principal e retorna a opção escolhida pelo usuário
      */
-    static void testarComTamanhos(int[] tamanhos, String nomeGrupo) {
-        System.out.println("\n\n" + "=".repeat(80));
-        System.out.println("TESTES COM VETORES " + nomeGrupo.toUpperCase());
-        System.out.println("=".repeat(80));
+    static int exibirMenu() {
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("         SISTEMA DE ORDENAÇÃO - AEDs II");
+        System.out.println("=".repeat(60));
+        System.out.println("Escolha o algoritmo de ordenação:");
+        System.out.println("  1 - BubbleSort");
+        System.out.println("  2 - InsertionSort");
+        System.out.println("  3 - SelectionSort");
+        System.out.println("  4 - MergeSort");
+        System.out.println("  0 - Sair");
+        System.out.println("-".repeat(60));
+        System.out.print("Digite sua opção: ");
         
-        for (int tam : tamanhos) {
-            System.out.println("\n" + "-".repeat(80));
-            System.out.println(">> Tamanho do vetor: " + tam);
-            System.out.println("-".repeat(80));
-            
-            // Gera um vetor aleatório para este tamanho
-            Integer[] vetor = gerarVetorObjetos(tam);
-            
-            // Exibe o vetor original apenas para tamanhos pequenos
-            if (tam <= 48) {
-                System.out.println("\nVetor original: " + Arrays.toString(vetor));
-            }
-            
-            // Testa os três algoritmos
-            BubbleSort<Integer> bubbleSort = new BubbleSort<>();
-            InsertionSort<Integer> insertionSort = new InsertionSort<>();
-            SelectionSort<Integer> selectionSort = new SelectionSort<>();
-            
-            testarAlgoritmo(bubbleSort, vetor, "BubbleSort");
-            testarAlgoritmo(insertionSort, vetor, "InsertionSort");
-            testarAlgoritmo(selectionSort, vetor, "SelectionSort");
-            
-            // Tabela comparativa para cada tamanho
-            System.out.println("\n--- RESUMO COMPARATIVO (Tamanho: " + tam + ") ---");
-            System.out.println("Algoritmo     | Comparações | Movimentações | Tempo (ms)");
-            System.out.println("--------------|-------------|---------------|------------");
-            System.out.printf("BubbleSort    | %11d | %13d | %10.3f\n", 
-                              bubbleSort.getComparacoes(), bubbleSort.getMovimentacoes(), bubbleSort.getTempoOrdenacao());
-            System.out.printf("InsertionSort | %11d | %13d | %10.3f\n", 
-                              insertionSort.getComparacoes(), insertionSort.getMovimentacoes(), insertionSort.getTempoOrdenacao());
-            System.out.printf("SelectionSort | %11d | %13d | %10.3f\n", 
-                              selectionSort.getComparacoes(), selectionSort.getMovimentacoes(), selectionSort.getTempoOrdenacao());
+        int opcao = scanner.nextInt();
+        scanner.nextLine(); // Limpa o buffer
+        return opcao;
+    }
+    
+    /**
+     * Solicita ao usuário o tamanho do vetor
+     */
+    static int solicitarTamanho() {
+        System.out.print("\nDigite o tamanho do vetor (ex: 10, 100, 1000): ");
+        int tamanho = scanner.nextInt();
+        scanner.nextLine();
+        
+        // Validação básica
+        while (tamanho <= 0) {
+            System.out.print("Tamanho inválido! Digite um valor positivo: ");
+            tamanho = scanner.nextInt();
+            scanner.nextLine();
         }
+        
+        // Aviso para vetores muito grandes
+        if (tamanho > 100_000) {
+            System.out.println("\n⚠️  ATENÇÃO: Vetor grande detectado!");
+            System.out.println("   - BubbleSort, InsertionSort e SelectionSort (O(n²)) podem ser EXTREMAMENTE lentos.");
+            System.out.println("   - MergeSort (O(n log n)) é recomendado para este tamanho.");
+            System.out.print("   Deseja continuar mesmo assim? (S/N): ");
+            String resposta = scanner.nextLine();
+            if (!resposta.equalsIgnoreCase("S")) {
+                System.out.println("Operação cancelada.");
+                return -1;
+            }
+        }
+        
+        return tamanho;
+    }
+    
+    /**
+     * Pergunta se o usuário deseja exibir o vetor ordenado
+     */
+    static boolean solicitarExibicaoVetor() {
+        System.out.print("\nDeseja exibir o vetor ordenado? (S/N): ");
+        String resposta = scanner.nextLine();
+        return resposta.equalsIgnoreCase("S");
+    }
+    
+    /**
+     * Pergunta se o usuário deseja realizar outro teste
+     */
+    static boolean solicitarNovoTeste() {
+        System.out.print("\nDeseja realizar outra ordenação? (S/N): ");
+        String resposta = scanner.nextLine();
+        return resposta.equalsIgnoreCase("S");
     }
 
-
     public static void main(String[] args) {
-        System.out.println("=== SISTEMA DE TESTE DE ALGORITMOS DE ORDENAÇÃO ===");
-        System.out.println("Algoritmos disponíveis: BubbleSort, InsertionSort, SelectionSort");
+        System.out.println("=== BEM-VINDO AO SISTEMA DE ORDENAÇÃO ===");
+        System.out.println("Algoritmos disponíveis: BubbleSort, InsertionSort, SelectionSort, MergeSort");
         
-        // ========== TESTE INICIAL COM VETOR PEQUENO (Tamanho 20) ==========
-        System.out.println("\n\n" + "=".repeat(80));
-        System.out.println("TESTE INICIAL COM VETOR DE TAMANHO 20");
-        System.out.println("=".repeat(80));
+        boolean continuar = true;
         
-        int tam = 20;
-        Integer[] vetor = gerarVetorObjetos(tam);
+        while (continuar) {
+            int opcao = exibirMenu();
+            
+            if (opcao == 0) {
+                System.out.println("\nEncerrando o programa. Até mais!");
+                continuar = false;
+                break;
+            }
+            
+            if (opcao < 1 || opcao > 4) {
+                System.out.println("\n❌ Opção inválida! Tente novamente.");
+                continue;
+            }
+            
+            // Solicita o tamanho do vetor
+            int tamanho = solicitarTamanho();
+            if (tamanho == -1) {
+                continue; // Usuário cancelou
+            }
+            
+            // Pergunta se quer exibir o vetor
+            boolean exibirVetor = solicitarExibicaoVetor();
+            
+            // Gera o vetor aleatório
+            System.out.println("\nGerando vetor aleatório de tamanho " + tamanho + "...");
+            Integer[] vetor = gerarVetorObjetos(tamanho);
+            
+            // Exibe o vetor original se for pequeno e o usuário quiser
+            if (exibirVetor && tamanho <= 48) {
+                System.out.println("Vetor original: " + Arrays.toString(vetor));
+            } else if (tamanho > 48 && exibirVetor) {
+                System.out.println("(Vetor muito grande para exibição - tamanho: " + tamanho + ")");
+            }
+            
+            System.out.println();
+            
+            // Executa o algoritmo escolhido
+            IOrdenador<Integer> ordenador;
+            String nomeAlgoritmo;
+            
+            switch (opcao) {
+                case 1:
+                    ordenador = new BubbleSort<>();
+                    nomeAlgoritmo = "BubbleSort";
+                    break;
+                case 2:
+                    ordenador = new InsertionSort<>();
+                    nomeAlgoritmo = "InsertionSort";
+                    break;
+                case 3:
+                    ordenador = new SelectionSort<>();
+                    nomeAlgoritmo = "SelectionSort";
+                    break;
+                case 4:
+                    ordenador = new MergeSort<>();
+                    nomeAlgoritmo = "MergeSort";
+                    break;
+                default:
+                    continue;
+            }
+            
+            testarAlgoritmo(ordenador, vetor, nomeAlgoritmo, exibirVetor);
+            
+            continuar = solicitarNovoTeste();
+        }
         
-        System.out.println("\nVetor original: " + Arrays.toString(vetor));
+        scanner.close();
         
-        BubbleSort<Integer> bolha = new BubbleSort<>();
-        InsertionSort<Integer> insercao = new InsertionSort<>();
-        SelectionSort<Integer> selecao = new SelectionSort<>();
-        
-        testarAlgoritmo(bolha, vetor, "BubbleSort");
-        testarAlgoritmo(insercao, vetor, "InsertionSort");
-        testarAlgoritmo(selecao, vetor, "SelectionSort");
-        
-        // Tabela comparativa do teste inicial
-        System.out.println("\n--- RESUMO COMPARATIVO (Tamanho: " + tam + ") ---");
-        System.out.println("Algoritmo     | Comparações | Movimentações | Tempo (ms)");
-        System.out.println("--------------|-------------|---------------|------------");
-        System.out.printf("BubbleSort    | %11d | %13d | %10.3f\n", 
-                          bolha.getComparacoes(), bolha.getMovimentacoes(), bolha.getTempoOrdenacao());
-        System.out.printf("InsertionSort | %11d | %13d | %10.3f\n", 
-                          insercao.getComparacoes(), insercao.getMovimentacoes(), insercao.getTempoOrdenacao());
-        System.out.printf("SelectionSort | %11d | %13d | %10.3f\n", 
-                          selecao.getComparacoes(), selecao.getMovimentacoes(), selecao.getTempoOrdenacao());
-        
-        // ========== TESTES COM DIFERENTES TAMANHOS ==========
-        
-        // Teste com vetores pequenos (3, 6, 12, 24, 48)
-        testarComTamanhos(tamanhosTestePequeno, "Pequenos");
-        
-        // Teste com vetores médios (12.500, 25.000, 50.000, 100.000, 200.000)
-        // ATENÇÃO: Para vetores médios, o BubbleSort pode ser muito lento!
-        // Descomente a linha abaixo se quiser testar (pode levar vários minutos)
-        // testarComTamanhos(tamanhosTesteMedio, "Médios");
-        
-        // Teste com vetores grandes (31.250.000, 62.500.000, 125.000.000, 250.000.000, 500.000.000)
-        // ATENÇÃO: Para vetores grandes, apenas algoritmos eficientes devem ser usados!
-        // BubbleSort e InsertionSort são O(n²) - podem levar horas ou dias!
-        // Descomente a linha abaixo apenas se tiver tempo e memória suficiente
-        // testarComTamanhos(tamanhosTesteGrande, "Grandes");
-        
-        System.out.println("\n\n" + "=".repeat(80));
-        System.out.println("FIM DOS TESTES");
-        System.out.println("=".repeat(80));
-        
-        // ========== ANÁLISE TEÓRICA ESPERADA ==========
-        System.out.println("\n=== ANÁLISE TEÓRICA DOS ALGORITMOS ===");
-        System.out.println("BubbleSort:");
-        System.out.println("  - Melhor caso: O(n)    | Pior caso: O(n²)");
-        System.out.println("  - Comparações: ~n²/2   | Movimentações: ~n²/2");
-        System.out.println();
-        System.out.println("InsertionSort:");
-        System.out.println("  - Melhor caso: O(n)    | Pior caso: O(n²)");
-        System.out.println("  - Comparações: ~n²/4   | Movimentações: ~n²/4");
-        System.out.println();
-        System.out.println("SelectionSort:");
-        System.out.println("  - Melhor caso: O(n²)   | Pior caso: O(n²)");
-        System.out.println("  - Comparações: ~n²/2   | Movimentações: ~n");
-        System.out.println();
-        System.out.println("OBSERVAÇÕES:");
-        System.out.println("  - SelectionSort tem MENOS movimentações que os outros");
-        System.out.println("  - InsertionSort é melhor para dados parcialmente ordenados");
-        System.out.println("  - BubbleSort geralmente é o pior dos três");
+        System.out.println("\n" + "=".repeat(60));
+        System.out.println("ANÁLISE DE COMPLEXIDADE DOS ALGORITMOS:");
+        System.out.println("=".repeat(60));
+        System.out.println("BubbleSort    - O(n²) - Muitas comparações e movimentações");
+        System.out.println("InsertionSort - O(n²) - Bom para dados parcialmente ordenados");
+        System.out.println("SelectionSort - O(n²) - Poucas movimentações, muitas comparações");
+        System.out.println("MergeSort     - O(n log n) - Eficiente para grandes volumes de dados");
+        System.out.println("=".repeat(60));
+        System.out.println("💡 DICA: Para vetores grandes (> 100.000), prefira o MergeSort!");
     }
 }
