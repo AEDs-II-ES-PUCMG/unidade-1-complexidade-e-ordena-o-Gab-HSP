@@ -280,10 +280,10 @@ public class App {
 
         int opcao = exibirMenuOrdenadores();
         switch (opcao) {
-            case 1 -> ordenador = new Bubblesort<>();
+            case 1 -> ordenador = new BubbleSort<>();
             case 2 -> ordenador = new InsertionSort<>();
             case 3 -> ordenador = new SelectionSort<>();
-            case 4 -> ordenador = new Mergesort<>();
+            case 4 -> ordenador = new MergeSort<>();
             case 5 -> ordenador = new Heapsort<>();
         }
 
@@ -362,17 +362,8 @@ public class App {
 
         teclado.close();    
     }
-        /**
-     * Localiza e exibe todos os pedidos cujo valor final seja maior ou igual a um valor de corte
-     * informado pelo usuário.
-     *
-     * Estratégia otimizada: o vetor pedidosOrdenadosPorValor é mantido ordenado de forma crescente
-     * pelo valor final (ComparadorCriterioA). Uma busca binária identifica o primeiro índice cujo
-     * valorFinal() >= valorCorte em O(log n), evitando varredura completa do vetor. Os pedidos
-     * elegíveis — todos a partir desse índice — são impressos em O(k), onde k é o número de
-     * resultados encontrados, sem recalcular valores abaixo do corte.
-     */
-    static void localizarPedidosPremium() {
+
+    static void localizarPedidos() {
 
         cabecalho();
         Double valorCorte = lerOpcao("Informe o valor de corte (R$): ", Double.class);
@@ -382,7 +373,6 @@ public class App {
             return;
         }
         
-        // Busca binária para encontrar o primeiro índice com valor >= valorCorte
         int esquerda = 0;
         int direita = quantPedidos - 1;
         int primeiroIndice = -1;
@@ -393,13 +383,12 @@ public class App {
             
             if (valorMeio >= valorCorte) {
                 primeiroIndice = meio;
-                direita = meio - 1; // Busca na metade esquerda por um índice menor
+                direita = meio - 1;
             } else {
                 esquerda = meio + 1;
             }
         }
         
-        // Exibe os resultados
         if (primeiroIndice == -1) {
             System.out.println("\nNenhum pedido encontrado com valor >= R$ " + String.format("%.2f", valorCorte));
         } else {
