@@ -1,230 +1,416 @@
+import java.nio.charset.Charset;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
-import java.util.Random;
+import java.util.Collections;
 import java.util.Scanner;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 
 public class App {
-    static final int[] tamanhosTesteGrande =  { 31_250_000, 62_500_000, 125_000_000, 250_000_000, 500_000_000 };
-    static final int[] tamanhosTesteMedio =   {     12_500,     25_000,      50_000,     100_000,     200_000 };
-    static final int[] tamanhosTestePequeno = {          3,          6,          12,          24,          48 };
-    static Random aleatorio = new Random();
-    static Scanner scanner = new Scanner(System.in);
-    static long operacoes;
-    static double nanoToMilli = 1.0/1_000_000;
+
+	/** Nome do arquivo de dados. O arquivo deve estar localizado na raiz do projeto */
+    static String nomeArquivoDados;
     
+    /** Scanner para leitura de dados do teclado */
+    static Scanner teclado;
 
-    /**
-     * Gerador de vetores aleatórios de tamanho pré-definido. 
-     * @param tamanho Tamanho do vetor a ser criado.
-     * @return Vetor com dados aleatórios, com valores entre 1 e (tamanho/2), desordenado.
-     */
-    static int[] gerarVetor(int tamanho){
-        int[] vetor = new int[tamanho];
-        for (int i = 0; i < tamanho; i++) {
-            vetor[i] = aleatorio.nextInt(1, tamanho/2);
-        }
-        return vetor;        
+    /** Vetor de produtos cadastrados */
+    static Produto[] produtosCadastrados;
+
+    /** Quantidade de produtos cadastrados atualmente no vetor */
+    static int quantosProdutos = 0;
+
+    /** Vetor de pedidos cadastrados */
+    static Pedido[] pedidosCadastrados;
+    
+    /** Vetor de pedidos ordenados pela data do pedido */
+    static Pedido[] pedidosOrdenadosPorData;
+
+    /** Vetor de pedidos ordenados pelo valor final (crescente) — usado para busca binária em localizarPedidosPremium */
+    static Pedido[] pedidosOrdenadosPorValor;
+    
+    /** Quantidade de pedidos cadastrados atualmente no vetor */
+    static int quantPedidos = 0;
+    
+    static IOrdenator<Pedido> ordenador;
+    
+    static void limparTela() {
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
     }
 
-    /**
-     * Gerador de vetores de objetos do tipo Integer aleatórios de tamanho pré-definido. 
-     * @param tamanho Tamanho do vetor a ser criado.
-     * @return Vetor de Objetos Integer com dados aleatórios, com valores entre 1 e (tamanho/2), desordenado.
-     */
-    static Integer[] gerarVetorObjetos(int tamanho) {
-        Integer[] vetor = new Integer[tamanho];
-        for (int i = 0; i < tamanho; i++) {
-            vetor[i] = aleatorio.nextInt(1, 10 * tamanho);
-        }
-        return vetor;
+    /** Gera um efeito de pausa na CLI. Espera por um enter para continuar */
+    static void pausa() {
+        System.out.println("Digite enter para continuar...");
+        teclado.nextLine();
     }
 
-    /**
-     * Método para testar um algoritmo de ordenação com um vetor específico
-     * @param ordenador O algoritmo de ordenação a ser testado
-     * @param vetorOriginal O vetor a ser ordenado
-     * @param nome Nome do algoritmo para exibição
-     * @param exibirVetor Se true, exibe o vetor ordenado
-     */
-    static void testarAlgoritmo(IOrdenador<Integer> ordenador, Integer[] vetorOriginal, String nome, boolean exibirVetor) {
-        Integer[] vetorCopia = vetorOriginal.clone();
-        
-        System.out.print("Ordenando com " + nome + "... ");
-        
-        Integer[] vetorOrdenado = ordenador.ordenar(vetorCopia);
-        
-        System.out.println("CONCLUÍDO!");
-        System.out.println("  Comparações: " + ordenador.getComparacoes());
-        System.out.println("  Movimentações: " + ordenador.getMovimentacoes());
-        System.out.println("  Tempo de ordenação: " + String.format("%.3f", ordenador.getTempoOrdenacao()) + " ms");
-        
-        // Verifica se o vetor foi ordenado corretamente
-        boolean estaOrdenado = true;
-        for (int i = 0; i < vetorOrdenado.length - 1; i++) {
-            if (vetorOrdenado[i].compareTo(vetorOrdenado[i+1]) > 0) {
-                estaOrdenado = false;
-                break;
-            }
-        }
-        System.out.println("  Vetor ordenado corretamente: " + (estaOrdenado ? "SIM" : "NÃO"));
-        
-        // Exibe o vetor ordenado se solicitado e se for pequeno
-        if (exibirVetor && vetorOriginal.length <= 48) {
-            System.out.println("  Vetor ordenado: " + Arrays.toString(vetorOrdenado));
-        }
+    /** Cabeçalho principal da CLI do sistema */
+    static void cabecalho() {
+        System.out.println("AEDs II COMÉRCIO DE COISINHAS");
+        System.out.println("=============================");
     }
-
-    /**
-     * Exibe o menu principal e retorna a opção escolhida pelo usuário
-     */
-    static int exibirMenu() {
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("         SISTEMA DE ORDENAÇÃO - AEDs II");
-        System.out.println("=".repeat(60));
-        System.out.println("Escolha o algoritmo de ordenação:");
-        System.out.println("  1 - BubbleSort");
-        System.out.println("  2 - InsertionSort");
-        System.out.println("  3 - SelectionSort");
-        System.out.println("  4 - MergeSort");
-        System.out.println("  0 - Sair");
-        System.out.println("-".repeat(60));
-        System.out.print("Digite sua opção: ");
+    
+    static <T extends Number> T lerOpcao(String mensagem, Class<T> classe) {
         
-        int opcao = scanner.nextInt();
-        scanner.nextLine(); // Limpa o buffer
-        return opcao;
+    	T valor;
+        
+    	System.out.println(mensagem);
+    	try {
+            valor = classe.getConstructor(String.class).newInstance(teclado.nextLine());
+        } catch (InstantiationException | IllegalAccessException | IllegalArgumentException 
+        		| InvocationTargetException | NoSuchMethodException | SecurityException e) {
+            return null;
+        }
+        return valor;
     }
     
     /**
-     * Solicita ao usuário o tamanho do vetor
+     * Lê os dados de um arquivo-texto e retorna um vetor de produtos. Arquivo-texto no formato
+     * N  (quantidade de produtos) <br/>
+     * tipo;descrição;preçoDeCusto;margemDeLucro;[dataDeValidade] <br/>
+     * Deve haver uma linha para cada um dos produtos. Retorna um vetor vazio em caso de problemas com o arquivo.
+     * @param nomeArquivoDados Nome do arquivo de dados a ser aberto.
+     * @return Um vetor com os produtos carregados, ou vazio em caso de problemas de leitura.
      */
-    static int solicitarTamanho() {
-        System.out.print("\nDigite o tamanho do vetor (ex: 10, 100, 1000): ");
-        int tamanho = scanner.nextInt();
-        scanner.nextLine();
-        
-        // Validação básica
-        while (tamanho <= 0) {
-            System.out.print("Tamanho inválido! Digite um valor positivo: ");
-            tamanho = scanner.nextInt();
-            scanner.nextLine();
-        }
-        
-        // Aviso para vetores muito grandes
-        if (tamanho > 100_000) {
-            System.out.println("\n⚠️  ATENÇÃO: Vetor grande detectado!");
-            System.out.println("   - BubbleSort, InsertionSort e SelectionSort (O(n²)) podem ser EXTREMAMENTE lentos.");
-            System.out.println("   - MergeSort (O(n log n)) é recomendado para este tamanho.");
-            System.out.print("   Deseja continuar mesmo assim? (S/N): ");
-            String resposta = scanner.nextLine();
-            if (!resposta.equalsIgnoreCase("S")) {
-                System.out.println("Operação cancelada.");
-                return -1;
-            }
-        }
-        
-        return tamanho;
+    static Produto[] lerProdutos(String nomeArquivoDados) {
+    	
+    	Scanner arquivo = null;
+    	int numProdutos;
+    	String linha;
+    	Produto produto;
+    	Produto[] produtosCadastrados;
+    	
+    	try {
+    		arquivo = new Scanner(new File(nomeArquivoDados), Charset.forName("UTF-8"));
+    		
+    		numProdutos = Integer.parseInt(arquivo.nextLine());
+    		produtosCadastrados = new Produto[numProdutos];
+    		
+    		for (int i = 0; i < numProdutos; i++) {
+    			linha = arquivo.nextLine();
+    			produto = Produto.criarDoTexto(linha);
+    			produtosCadastrados[i] = produto;
+    		}
+    		quantosProdutos = numProdutos;
+    		
+    	} catch (IOException excecaoArquivo) {
+    		produtosCadastrados = null;
+    	} finally {
+    		arquivo.close();
+    	}
+    	
+    	return produtosCadastrados;
     }
     
     /**
-     * Pergunta se o usuário deseja exibir o vetor ordenado
+     * Lê os dados de um arquivo-texto e retorna um vetor de pedidos. Arquivo-texto no formato
+     * N  (quantidade de pedidos) <br/>
+     * dataDoPedido;formaDePagamento;descrições dos produtos do pedido <br/>
+     * Deve haver uma linha para cada um dos pedidos. Retorna um vetor vazio em caso de problemas com o arquivo.
+     * @param nomeArquivoDados Nome do arquivo de dados a ser aberto.
+     * @return Um vetor com os pedidos carregados, ou vazio em caso de problemas de leitura.
      */
-    static boolean solicitarExibicaoVetor() {
-        System.out.print("\nDeseja exibir o vetor ordenado? (S/N): ");
-        String resposta = scanner.nextLine();
-        return resposta.equalsIgnoreCase("S");
+    static Pedido[] lerPedidos(String nomeArquivoDados) {
+    	
+    	Pedido[] pedidosCadastrados;
+    	Scanner arquivo = null;
+    	int numPedidos;
+    	String linha;
+    	Pedido pedido;
+    	
+    	try {
+    		arquivo = new Scanner(new File(nomeArquivoDados), Charset.forName("UTF-8"));
+    		
+    		numPedidos = Integer.parseInt(arquivo.nextLine());
+    		pedidosCadastrados = new Pedido[numPedidos];
+    		
+    		for (int i = 0; i < numPedidos; i++) {
+    			linha = arquivo.nextLine();
+    			pedido = criarPedido(linha);
+    			pedidosCadastrados[i] = pedido;
+    		}
+    		quantPedidos = numPedidos;
+    		
+    	} catch (IOException excecaoArquivo) {
+    		pedidosCadastrados = null;
+    	} finally {
+    		arquivo.close();
+    	}
+    	
+    	return pedidosCadastrados;
     }
     
-    /**
-     * Pergunta se o usuário deseja realizar outro teste
+    private static Pedido criarPedido(String dados) {
+
+    	String[] dadosPedido;
+    	DateTimeFormatter formatoData;
+    	LocalDate dataDoPedido;
+    	int formaDePagamento;
+    	Pedido pedido;
+    	Produto produto;
+
+    	dadosPedido = dados.split(";");
+
+    	formatoData = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    	dataDoPedido = LocalDate.parse(dadosPedido[0], formatoData);
+
+    	formaDePagamento = Integer.parseInt(dadosPedido[1]);
+
+    	pedido = new Pedido(dataDoPedido, formaDePagamento);
+
+    	for (int i = 2; i < dadosPedido.length; i++) {
+    		String campo = dadosPedido[i];
+    		String nomeProduto;
+    		int quantidade;
+
+    		int separador = campo.lastIndexOf(':');
+    		if (separador >= 0) {
+    			nomeProduto = campo.substring(0, separador);
+    			try {
+    				quantidade = Integer.parseInt(campo.substring(separador + 1));
+    			} catch (NumberFormatException e) {
+    				nomeProduto = campo;
+    				quantidade = 1;
+    			}
+    		} else {
+    			nomeProduto = campo;
+    			quantidade = 1;
+    		}
+
+    		produto = pesquisarProduto(nomeProduto);
+    		pedido.incluirProduto(produto, quantidade);
+    	}
+    	return pedido;
+    }
+    
+    /** Localiza um produto no vetor de produtos cadastrados, a partir do nome de produto passado como parâmetro para esse método. 
+     *  A busca não é sensível ao caso.
+     *  @param pesquisado Nome do produto a ser pesquisado no vetor de produtos cadastrados. 
+     *  @return O produto encontrado ou null, caso o produto não tenha sido localizado no vetor de produtos cadastrados.
      */
-    static boolean solicitarNovoTeste() {
-        System.out.print("\nDeseja realizar outra ordenação? (S/N): ");
-        String resposta = scanner.nextLine();
-        return resposta.equalsIgnoreCase("S");
+    static Produto pesquisarProduto(String pesquisado) {
+        
+    	Produto produto = null;
+    	Boolean localizado = false;
+    	
+    	for (int i = 0; (i < quantosProdutos && !localizado); i++) {
+        	if (produtosCadastrados[i].descricao.equals(pesquisado)) {
+        		produto = produtosCadastrados[i];
+        		localizado = true;
+        	}
+        }
+        
+        if (!localizado) {
+        	return null;
+        } else {
+        	return(produto);
+        }     
+    }
+    
+    /** Imprime o menu principal, lê a opção do usuário e a retorna (int).
+     * @return Um inteiro com a opção do usuário.
+    */
+    static int menu() {
+        cabecalho();
+        System.out.println("1 - Ordenar pedidos");
+        System.out.println("2 - Embaralhar pedidos");
+        System.out.println("3 - Listar todos os pedidos");
+        System.out.println("4 - Localizar pedidos premium (por valor de corte)");
+        System.out.println("0 - Finalizar");
+        
+        return lerOpcao("Digite sua opção: ", Integer.class);
+    }
+    
+    
+    /**
+     * Localiza e exibe todos os pedidos cujo valor final seja maior ou igual a um valor de corte
+     * informado pelo usuário.
+     *
+     * Estratégia otimizada: o vetor pedidosOrdenadosPorValor é mantido ordenado de forma crescente
+     * pelo valor final (ComparadorCriterioA). Uma busca binária identifica o primeiro índice cujo
+     * valorFinal() >= valorCorte em O(log n), evitando varredura completa do vetor. Os pedidos
+     * elegíveis — todos a partir desse índice — são impressos em O(k), onde k é o número de
+     * resultados encontrados, sem recalcular valores abaixo do corte.
+     */
+    static void localizarPedidosPremium() {
+
+        cabecalho();
+        Double valorCorte = lerOpcao("Informe o valor de corte (R$): ", Double.class);
+
+        if (valorCorte == null) {
+            System.out.println("Valor inválido!");
+            return;
+        }
+
+       
     }
 
-    public static void main(String[] args) {
-        System.out.println("=== BEM-VINDO AO SISTEMA DE ORDENAÇÃO ===");
-        System.out.println("Algoritmos disponíveis: BubbleSort, InsertionSort, SelectionSort, MergeSort");
-        
-        boolean continuar = true;
-        
-        while (continuar) {
-            int opcao = exibirMenu();
-            
-            if (opcao == 0) {
-                System.out.println("\nEncerrando o programa. Até mais!");
-                continuar = false;
-                break;
-            }
-            
-            if (opcao < 1 || opcao > 4) {
-                System.out.println("\n❌ Opção inválida! Tente novamente.");
-                continue;
-            }
-            
-            // Solicita o tamanho do vetor
-            int tamanho = solicitarTamanho();
-            if (tamanho == -1) {
-                continue; // Usuário cancelou
-            }
-            
-            // Pergunta se quer exibir o vetor
-            boolean exibirVetor = solicitarExibicaoVetor();
-            
-            // Gera o vetor aleatório
-            System.out.println("\nGerando vetor aleatório de tamanho " + tamanho + "...");
-            Integer[] vetor = gerarVetorObjetos(tamanho);
-            
-            // Exibe o vetor original se for pequeno e o usuário quiser
-            if (exibirVetor && tamanho <= 48) {
-                System.out.println("Vetor original: " + Arrays.toString(vetor));
-            } else if (tamanho > 48 && exibirVetor) {
-                System.out.println("(Vetor muito grande para exibição - tamanho: " + tamanho + ")");
-            }
-            
-            System.out.println();
-            
-            // Executa o algoritmo escolhido
-            IOrdenador<Integer> ordenador;
-            String nomeAlgoritmo;
-            
+    static int exibirMenuOrdenadores() {
+        cabecalho();
+        System.out.println("1 - Bolha");
+        System.out.println("2 - Inserção"); 
+        System.out.println("3 - Seleção"); 
+        System.out.println("4 - Mergesort"); 
+        System.out.println("5 - Heapsort"); 
+        System.out.println("0 - Finalizar");
+       
+        return lerOpcao("Digite sua opção: ", Integer.class);
+    }
+    
+    static int exibirMenuComparadores() {
+        cabecalho();
+        System.out.println("1 - Critério A: Valor Final do Pedido");
+        System.out.println("2 - Critério B: Volume Total de Itens");
+        System.out.println("3 - Critério C: Índice de Economia (Decrescente)");
+
+        return lerOpcao("Digite sua opção: ", Integer.class);
+    }
+    
+    /** Ordena o vetor de pedidos cadastrados empregando um método de ordenação selecionado pelo
+     *  usuário, dentre os seguintes: bolha, seleção, inserção, mergesort e heapsort.
+     *  O usuário também escolhe um critério de ordenação: A (Valor Final), B (Volume de Itens)
+     *  ou C (Índice de Economia, decrescente).
+     *  O método interage com o usuário por meio de menus e aplica
+     *  a ordenação escolhida. Ao final, exibe o tempo total gasto no processo de ordenação, em ms.
+    */
+    static void ordenarPedidos(){
+
+        int opcao = exibirMenuOrdenadores();
+        switch (opcao) {
+            case 1 -> ordenador = new Bubblesort<>();
+            case 2 -> ordenador = new InsertionSort<>();
+            case 3 -> ordenador = new SelectionSort<>();
+            case 4 -> ordenador = new Mergesort<>();
+            case 5 -> ordenador = new Heapsort<>();
+        }
+
+        if (ordenador != null) {
+            opcao = exibirMenuComparadores();
             switch (opcao) {
                 case 1:
-                    ordenador = new BubbleSort<>();
-                    nomeAlgoritmo = "BubbleSort";
+                    ordenador.setComparador(new ComparadorCriterioA());
+                    pedidosCadastrados = ordenador.ordenar(pedidosCadastrados);
                     break;
                 case 2:
-                    ordenador = new InsertionSort<>();
-                    nomeAlgoritmo = "InsertionSort";
+                    ordenador.setComparador(new ComparadorCriterioB());
+                    pedidosCadastrados = ordenador.ordenar(pedidosCadastrados);
                     break;
                 case 3:
-                    ordenador = new SelectionSort<>();
-                    nomeAlgoritmo = "SelectionSort";
-                    break;
-                case 4:
-                    ordenador = new MergeSort<>();
-                    nomeAlgoritmo = "MergeSort";
+                    ordenador.setComparador(new ComparadorCriterioC());
+                    pedidosCadastrados = ordenador.ordenar(pedidosCadastrados);
                     break;
                 default:
-                    continue;
+                    pedidosCadastrados = ordenador.ordenar(pedidosCadastrados);
             }
-            
-            testarAlgoritmo(ordenador, vetor, nomeAlgoritmo, exibirVetor);
-            
-            continuar = solicitarNovoTeste();
+
+            System.out.println("Tempo gasto com a ordenação dos pedidos: " + ordenador.getTempoOrdenacao() + " ms.");
+        }
+        ordenador = null;
+    }
+
+    static void embaralharPedidos(){
+        Collections.shuffle(Arrays.asList(pedidosCadastrados));
+    }
+
+    /** Lista todos os pedidos cadastrados, numerados, um por linha */
+    static void listarTodosOsPedidos() {
+    	
+        cabecalho();
+        System.out.println("\nPedidos cadastrados: ");
+        for (int i = 0; i < quantPedidos; i++) {
+        	System.out.println(String.format("%02d - %s\n", (i + 1), pedidosCadastrados[i].toString()));
+        }
+    }
+    
+    public static void main(String[] args) {
+		
+    	teclado = new Scanner(System.in, Charset.forName("UTF-8"));
+        
+    	nomeArquivoDados = "produtos.txt";
+        produtosCadastrados = lerProdutos(nomeArquivoDados);
+       
+        String nomeArquivoPedidos = "pedidos.txt";
+        pedidosCadastrados = lerPedidos(nomeArquivoPedidos);
+        
+        ComparadorPorData comparadorPorData = new ComparadorPorData();
+        ordenador = new Heapsort<>();
+        ordenador.setComparador(comparadorPorData);
+        pedidosOrdenadosPorData = ordenador.ordenar(pedidosCadastrados);
+
+        // Cria cópia independente ordenada por valorFinal() (crescente) para busca binária em localizarPedidosPremium
+        pedidosOrdenadosPorValor = Arrays.copyOf(pedidosCadastrados, quantPedidos);
+        IOrdenator<Pedido> ordenadorValor = new Heapsort<>();
+        ordenadorValor.setComparador(new ComparadorCriterioA());
+        pedidosOrdenadosPorValor = ordenadorValor.ordenar(pedidosOrdenadosPorValor);
+
+        int opcao = -1;
+      
+        do{
+        	opcao = menu();
+            switch (opcao) {
+                case 1 -> ordenarPedidos();
+                case 2 -> embaralharPedidos();
+                case 3 -> listarTodosOsPedidos();
+                case 4 -> localizarPedidosPremium();
+                case 0 -> System.out.println("FLW VLW OBG VLT SMP.");
+            }
+            pausa();
+        } while (opcao != 0);       
+
+        teclado.close();    
+    }
+        /**
+     * Localiza e exibe todos os pedidos cujo valor final seja maior ou igual a um valor de corte
+     * informado pelo usuário.
+     *
+     * Estratégia otimizada: o vetor pedidosOrdenadosPorValor é mantido ordenado de forma crescente
+     * pelo valor final (ComparadorCriterioA). Uma busca binária identifica o primeiro índice cujo
+     * valorFinal() >= valorCorte em O(log n), evitando varredura completa do vetor. Os pedidos
+     * elegíveis — todos a partir desse índice — são impressos em O(k), onde k é o número de
+     * resultados encontrados, sem recalcular valores abaixo do corte.
+     */
+    static void localizarPedidosPremium() {
+
+        cabecalho();
+        Double valorCorte = lerOpcao("Informe o valor de corte (R$): ", Double.class);
+
+        if (valorCorte == null) {
+            System.out.println("Valor inválido!");
+            return;
         }
         
-        scanner.close();
+        // Busca binária para encontrar o primeiro índice com valor >= valorCorte
+        int esquerda = 0;
+        int direita = quantPedidos - 1;
+        int primeiroIndice = -1;
         
-        System.out.println("\n" + "=".repeat(60));
-        System.out.println("ANÁLISE DE COMPLEXIDADE DOS ALGORITMOS:");
-        System.out.println("=".repeat(60));
-        System.out.println("BubbleSort    - O(n²) - Muitas comparações e movimentações");
-        System.out.println("InsertionSort - O(n²) - Bom para dados parcialmente ordenados");
-        System.out.println("SelectionSort - O(n²) - Poucas movimentações, muitas comparações");
-        System.out.println("MergeSort     - O(n log n) - Eficiente para grandes volumes de dados");
-        System.out.println("=".repeat(60));
-        System.out.println("💡 DICA: Para vetores grandes (> 100.000), prefira o MergeSort!");
+        while (esquerda <= direita) {
+            int meio = (esquerda + direita) / 2;
+            double valorMeio = pedidosOrdenadosPorValor[meio].valorFinal();
+            
+            if (valorMeio >= valorCorte) {
+                primeiroIndice = meio;
+                direita = meio - 1; // Busca na metade esquerda por um índice menor
+            } else {
+                esquerda = meio + 1;
+            }
+        }
+        
+        // Exibe os resultados
+        if (primeiroIndice == -1) {
+            System.out.println("\nNenhum pedido encontrado com valor >= R$ " + String.format("%.2f", valorCorte));
+        } else {
+            System.out.println("\n=== PEDIDOS PREMIUM (Valor >= R$ " + String.format("%.2f", valorCorte) + ") ===\n");
+            int contador = 0;
+            for (int i = primeiroIndice; i < quantPedidos; i++) {
+                System.out.println(pedidosOrdenadosPorValor[i].toString());
+                System.out.println("----------------------------------------");
+                contador++;
+            }
+            System.out.println("Total de pedidos encontrados: " + contador);
+        }
     }
 }
