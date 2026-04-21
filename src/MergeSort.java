@@ -1,6 +1,6 @@
 import java.util.Comparator;
 
-public class Mergesort<T extends Comparable<T>> implements IOrdenator<T> {
+public class MergeSort<T extends Comparable<T>> implements IOrdenator<T> {
 
 	private T[] dadosOrdenados;
 	private Comparator<T> comparador;
@@ -9,14 +9,14 @@ public class Mergesort<T extends Comparable<T>> implements IOrdenator<T> {
 	private long inicio;
 	private long termino;
 	
-	public Mergesort() {
+	public MergeSort() {
 		
 		comparacoes = 0;
 		movimentacoes = 0;
 		setComparador(T::compareTo);
 	}
 	
-	public Mergesort(Comparator<T> comparador) {
+	public MergeSort(Comparator<T> comparador) {
 		
 		comparacoes = 0;
 		movimentacoes = 0;
